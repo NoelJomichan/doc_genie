@@ -36,7 +36,7 @@ Document Genie is an intelligent chat interface that allows users to query both 
 
 1. Clone the repository:
    ```
-   git clone https://github.com/NoelJomichan/document_genie.git
+   git clone https://github.com/NoelJomichan/doc_genie.git
    cd document-genie
    ```
 
