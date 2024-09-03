@@ -4,3 +4,4 @@ langchain_openai
 smtplib
 llama-parse
 faiss-cpu
+langchain-community

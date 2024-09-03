@@ -21,18 +21,6 @@
         "phone": "+3456789012",
         "address": "789 Pine St"
       }
-    ],
-    "admins": [
-        {
-            "admin_id": 1,
-            "name": "Noel",
-            "email": "noeloneture@gmail.com"
-        },
-        {
-            "admin_id": 2,
-            "name": "Omkar",
-            "email": "omkaroneture@gmail.com"
-        }
-    ]
+    ] 
   }
   

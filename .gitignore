@@ -1,2 +1,3 @@
 .venv
-.secrets.toml
+thoughts.txt
+.streamlit/secrets.toml

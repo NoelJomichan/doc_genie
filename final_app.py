@@ -2,7 +2,7 @@ import json
 import streamlit as st
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
@@ -14,8 +14,8 @@ import os
 from llama_parse import LlamaParse
 
 # Load the API key from secrets.toml
-openai_api_key = st.secrets["OPENAI_API_KEY"]
-email_password = st.secrets["EMAIL_PASSWORD"]
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+EMAIL_PASSWORD = st.secrets["EMAIL_PASSWORD"]
 os.environ["LLAMA_CLOUD_API_KEY"] = st.secrets["LLAMA_API_KEY"]
 
 st.set_page_config(page_title="Document Genie", layout="wide")
@@ -39,7 +39,7 @@ def load_customer_data():
         return json.load(f)
     
 def get_openai_model(temperature=0.3):
-    return ChatOpenAI(model_name="gpt-4o-mini", temperature=temperature, openai_api_key=openai_api_key)
+    return ChatOpenAI(model_name="gpt-4o-mini", temperature=temperature, openai_api_key=OPENAI_API_KEY)
 
 # Loads and processes the pdf and keeps it stored in cache memory to avoid reprocessing.
 @st.cache_resource(show_spinner="Ingesting PDF..")
@@ -51,7 +51,7 @@ def load_and_process_pdf():
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = text_splitter.split_text(text)
     
-    embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
     vector_store = FAISS.from_texts(chunks, embedding=embeddings)
     
     return vector_store
@@ -61,12 +61,11 @@ def detect_intent_and_extract_id(user_input, conversation_history):
     model = get_openai_model(temperature=0)
     
     response_schemas = [
-        ResponseSchema(name="intent", description="The intent of the user's query: either 'document' or 'database'"),
-        ResponseSchema(name="customer_id", description="If customer ID provided in the user input, set intent to 'database'.")
+        ResponseSchema(name="intent", description="The intent of the user's input: either 'document' or 'database'"),
+        ResponseSchema(name="customer_id", description="Customer id in int format. If customer ID provided in the user input, set intent to 'database'.")
     ]
     output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
-    limited_history = conversation_history[-3:]
-    conversation_context = "\n".join([f"{'Human' if isinstance(msg, HumanMessage) else 'AI'}: {msg.content}" for msg in limited_history])
+    conversation_context = "\n".join([f"{'Human' if isinstance(msg, HumanMessage) else 'AI'}: {msg.content}" for msg in conversation_history[-6:]])
 
     prompt = f"""
     Given the following conversation history:
@@ -78,7 +77,7 @@ def detect_intent_and_extract_id(user_input, conversation_history):
     Determine the intent:
     {output_parser.get_format_instructions()}
 
-    If the intent is "database" but no customer ID is provided, set "customer_id" to null.
+    If no customer ID is provided, set "intent" to 'document' and 'customer_id' to 'null'.
     Take into account the entire conversation history when determining the intent and customer ID.
     """
     
@@ -87,7 +86,6 @@ def detect_intent_and_extract_id(user_input, conversation_history):
         return output_parser.parse(response)
     except Exception as e:
         print(f"Error parsing response: {e}")
-        print(f"Raw response: {response}")
         # Return a default response if parsing fails
         return {"intent": "unknown", "customer_id": None}
 
@@ -107,7 +105,7 @@ def get_conversational_chain():
 
     Answer:
     """
-    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question", "history"])
     return load_qa_chain(get_openai_model(), chain_type="stuff", prompt=prompt)
 
 
@@ -115,14 +113,14 @@ def process_document_query(user_question, vector_store, conversation_history):
     try:
         docs = vector_store.similarity_search(user_question, k=10)
         chain = get_conversational_chain()
-        limited_history = conversation_history[-3:]
-        history_text = "\n".join([f"{'Human' if isinstance(msg, HumanMessage) else 'AI'}: {msg.content}" for msg in limited_history])
+        history_text = "\n".join([f"{'Human' if isinstance(msg, HumanMessage) else 'AI'}: {msg.content}" for msg in conversation_history[-6:]])
 
         response = chain(
             {
                 "input_documents": docs, 
                 "question": user_question, 
-                "history": history_text
+                "history": history_text, 
+                
             }, 
             return_only_outputs=True
         )
@@ -142,7 +140,7 @@ def send_otp(email):
 
     with smtplib.SMTP('smtp.gmail.com', 587) as server:
         server.starttls()
-        server.login(msg['From'], "rfbw jnrw scdz wkxg")
+        server.login(msg['From'], EMAIL_PASSWORD)
         server.sendmail(msg['From'], email, msg.as_string())
         server.quit()
 
@@ -154,10 +152,8 @@ def send_otp(email):
 def process_database_query(user_question, customer_id, conversation_history):
     customers = load_customer_data()
     for customer in customers['customers']:
-        print(customer["customer_id"])
         if customer_id == customer["customer_id"]:
-            limited_history = conversation_history[-3:]
-            history_text = "\n".join([f"{'Human' if isinstance(msg, HumanMessage) else 'AI'}: {msg.content}" for msg in limited_history])
+            history_text = "\n".join([f"{'Human' if isinstance(msg, HumanMessage) else 'AI'}: {msg.content}" for msg in conversation_history[-6:]])
             
             prompt = f"""
             Given the following conversation history:
@@ -189,7 +185,7 @@ def login():
     if st.session_state.otp_sent:
         otp_input = st.sidebar.text_input("Enter OTP")
         if st.sidebar.button("Login"):
-            if otp_input == st.session_state.otp:
+            if otp_input.strip() == st.session_state.otp:
                 st.session_state.authenticated = True
                 st.sidebar.success("Login successful!")
             else:
@@ -202,7 +198,7 @@ def load_response(func, var1, var2, var3, spinner_text):
 
 
 def main():
-    st.header("Document Genie Chat", anchor=False, divider="red")
+    st.header("Document Genie Chat", divider="red")
 
     login()
 
