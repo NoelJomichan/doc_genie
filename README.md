@@ -37,7 +37,7 @@ Document Genie is an intelligent chat interface that allows users to query both 
 1. Clone the repository:
    ```
    git clone https://github.com/NoelJomichan/doc_genie.git
-   cd document-genie
+   cd doc-genie
    ```
 
 2. Create a virtual environment (optional but recommended):
@@ -78,3 +78,7 @@ Document Genie is an intelligent chat interface that allows users to query both 
 - OpenAI's language models for natural language processing
 - FAISS for efficient similarity search in document querying
 - Email-based OTP system for secure authentication
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
